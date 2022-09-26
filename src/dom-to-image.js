@@ -236,11 +236,41 @@
 
                     function copyProperties(source, target) {
                         util.asArray(source).forEach(function (name) {
-                            target.setProperty(
-                                name,
-                                source.getPropertyValue(name),
-                                source.getPropertyPriority(name)
-                            );
+							target.setProperty(
+									name,
+									source.getPropertyValue(name),
+									source.getPropertyPriority(name)
+								);
+							/*
+								if(name == "-webkit-mask-image" || name == "mask-image")
+								{
+									var tempX = source.getPropertyValue(name).split('"')[1];
+									if(tempX != undefined)
+									{
+										var tempX2 = tempX.split('/')[tempX.split('/').length - 1];
+										console.log(tempX2);
+										var request = new XMLHttpRequest();
+										request.open('GET', 'icons/base64.php?img='+tempX2, false);
+										request.send();
+
+										if (request.status === 200) {
+										  target.setProperty(
+												name,
+												request.response,
+												source.getPropertyPriority(name)
+											);
+										}
+									}
+								}
+								else
+								{
+									target.setProperty(
+										name,
+										source.getPropertyValue(name),
+										source.getPropertyPriority(name)
+									);
+								}
+							*/
                         });
                     }
                 }
@@ -734,7 +764,68 @@
 
         function inlineAll(node) {
             if (!(node instanceof Element)) return Promise.resolve(node);
+			
+			
+            return inlineWebkitMaskImage(node)
+                .then(function () {
+                    if (node instanceof HTMLImageElement)
+                        return newImage(node).inline();
+                    else
+                        return Promise.all(
+                            util.asArray(node.childNodes).map(function (child) {
+                                return inlineAll(child);
+                            })
+                        );
+                });
 
+            function inlineWebkitMaskImage(node) {
+                var webkitMaskImage = node.style.getPropertyValue('-webkit-mask-image');
+
+                if (!webkitMaskImage) return Promise.resolve(node);
+
+                return inliner.inlineAll(webkitMaskImage)
+                    .then(function (inlined) {
+                        node.style.setProperty(
+                            '-webkit-mask-image',
+                            inlined,
+                            node.style.getPropertyPriority('-webkit-mask-image')
+                        );
+                    })
+                    .then(function () {
+                        return inlineMaskImage(node); //Ora cerco se ha un mask image..
+                    });
+            }
+			
+			return inlineMaskImage(node)
+                .then(function () {
+                    if (node instanceof HTMLImageElement)
+                        return newImage(node).inline();
+                    else
+                        return Promise.all(
+                            util.asArray(node.childNodes).map(function (child) {
+                                return inlineAll(child);
+                            })
+                        );
+                });
+
+            function inlineMaskImage(node) {
+                var MaskImage = node.style.getPropertyValue('-webkit-mask-image');
+
+                if (!MaskImage) return Promise.resolve(node);
+
+                return inliner.inlineAll(MaskImage)
+                    .then(function (inlined) {
+                        node.style.setProperty(
+                            '-webkit-mask-image',
+                            inlined,
+                            node.style.getPropertyPriority('-webkit-mask-image')
+                        );
+                    })
+                    .then(function () {
+                        return inlineBackground(node); //Ora cerco se ha background..
+                    });
+            }
+			
             return inlineBackground(node)
                 .then(function () {
                     if (node instanceof HTMLImageElement)
